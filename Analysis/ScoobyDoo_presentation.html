@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>DATA 612 - Project 3</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Binh Minh An Nguyen" />
+    <meta name="date" content="2021-12-09" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# DATA 612 - Project 3
+## A Scooby-Doo Dataset Project
+### Binh Minh An Nguyen
+### 2021-12-09
+
+---
+
+class: top
+background-image: url(https://i.pinimg.com/originals/d5/2c/23/d52c2351fb92e34df234c43ad3c5799f.jpg)
+background-size: contain
+
+
+class: bottom
+
+## Scooby-Doo by-Doo, Where are you ?
+
+### We have got some works to do right now...
+
+
+
+???
+
+Image credit: [Shaila Williams](https://www.pinterest.com/shailswhales/scooby-doo/)
+
+---
+# Executive Summary
+
+### Data source &amp; Inspirations
+
+--
+
+### Data Challenge
+
+- Overview
+
+- Challenges
+
+--
+
+### Culprits' Genders Overtime
+
+--
+
+### Who was the best detective?
+
+--
+
+### Overview Scooby-Doo Rating
+
+---
+class: inverse, center, middle
+
+# Scooby-Doo by-Doo, Where are you ?
+
+### We shall start our works now...
+
+---
+
+# Data Source &amp; Inspirations
+
+- Data source: [TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-07-13/readme.md)
+
+--
+
+- Access Scooby-Doo data by:
+
+
+```r
+scoobydoo &lt;- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-13/scoobydoo.csv")
+```
+
+--
+
+- Project Inspiration: _Predict which #TidyTuesday Scooby Doo monsters are REAL with a tuned decision tree model_ by [Jilia Silge](https://juliasilge.com/blog/scooby-doo/?fbclid=IwAR0Z4KIDtgXopelQeFN50rorqvZo4Na8tY_SP_PT0RxMiAFNalHxxSftOvw)
+
+--
+
+- Point of Interests: Culprits' genders overtime; Who captured the most culprit?; IMDB rating by type overtime
+
+---
+# Data Exploration &amp; Challenge
+
+- Each row = An episode records the type, rating, aired-time, aired-region, culprits' traits, voice actors/actresses, main characters' activities
+
+- 603 observations and 75 columns but not all of them are proper variables
+
+--
+
+- Improper datatype [1]
+
+--
+
+- Value chunk within one single cell ~ conflict with criteria of a tibble [2]
+
+--
+
+.footnote[
+[1], [2] These data challenges will be displayed while doing ETL
+]
+
+---
+
+class: center, middle, inverse
+
+# Culprits' Gender Overtime
+
+---
+
+# Culprits' Genders Overtime
+
+### Data Exploration &amp; Challenges
+
+- Multiple values represent traits of the culprits within one single cell
+
+
+
+- Some `culprit_gender = NULL` because not all of the culprits are `Human`
+
+
+```r
+scoobydoo %&gt;%
+  filter(culprit_gender == "NULL") %&gt;%
+  select(monster_type, monster_gender, culprit_gender) %&gt;%
+  head()
+```
+
+```
+## # A tibble: 6 × 3
+##   monster_type                              monster_gender culprit_gender
+##   &lt;chr&gt;                                     &lt;chr&gt;          &lt;chr&gt;         
+## 1 Super-Villain,Super-Villain,Super-Villain Male,Male,Male NULL          
+## 2 NULL                                      NULL           NULL          
+## 3 NULL                                      NULL           NULL          
+## 4 NULL                                      NULL           NULL          
+## 5 NULL                                      NULL           NULL          
+## 6 NULL                                      NULL           NULL
+```
+
+
+---
+
+# Culprits' Gender Overtime
+
+### Data ETL
+
+- Address the data challenges
+
+
+```r
+scooby_bd &lt;- scoobydoo %&gt;%
+  select(index, imdb, format, date_aired, monster_gender, monster_type, culprit_gender) %&gt;%
+  filter(culprit_gender != "NULL") %&gt;%
+  # Breakdown multiple values into multiple rows
+* separate_rows(monster_gender, sep = ",", convert = TRUE) %&gt;%
+* separate_rows(monster_type, sep = ",", convert = TRUE) %&gt;%
+* separate_rows(culprit_gender, sep = ",", convert = TRUE) %&gt;%
+  mutate(
+    culprit_gender = ifelse(culprit_gender != "Female", "Male", "Female"),
+    year_aired = 10 * ((lubridate::year(date_aired) + 1) %/% 10)
+  )
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data ETL
+
+- Count the number of culprits by the Scooby-Doo's aired years and the culprits' genders
+
+
+```r
+# To ensure that there is no duplicate
+scooby_bd &lt;- scooby_bd %&gt;%
+  distinct() %&gt;%
+  group_by(year_aired, culprit_gender) %&gt;%
+  summarize(count = n()) %&gt;%
+* mutate(percentage_gender = round((count / sum(count)) * 100, 2))
+```
+
+```
+## `summarise()` has grouped output by 'year_aired'. You can override using the `.groups` argument.
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data ETL
+
+- Check the ETL results:
+
+
+```r
+scooby_bd
+```
+
+```
+## # A tibble: 12 × 4
+## # Groups:   year_aired [6]
+##    year_aired culprit_gender count percentage_gender
+##         &lt;dbl&gt; &lt;chr&gt;          &lt;int&gt;             &lt;dbl&gt;
+##  1       1970 Female            21              13.3
+##  2       1970 Male             137              86.7
+##  3       1980 Female            17              13.9
+##  4       1980 Male             105              86.1
+##  5       1990 Female             4              23.5
+##  6       1990 Male              13              76.5
+##  7       2000 Female            34              33.7
+##  8       2000 Male              67              66.3
+##  9       2010 Female            75              35.7
+## 10       2010 Male             135              64.3
+## 11       2020 Female            39              40.6
+## 12       2020 Male              57              59.4
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data Visualization
+
+- Create a bar chart display the **trend of culprits' genders** over the past 6 decades
+
+
+```r
+culprit_gender &lt;- scooby_bd %&gt;%
+* ggplot(aes(x = factor(year_aired), y = percentage_gender, fill = culprit_gender)) +
+* geom_col(position = position_dodge(preserve = "single"), alpha = 0.8)
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data Visualization
+
+- Add elements to the chart
+
+
+```r
+culprit_gender &lt;- culprit_gender +
+* labs(x = "Years", y = "Culprit Count (%)", fill = "Genders") +
+* theme_classic() +
+* theme(legend.title = element_blank()) +
+* ggtitle("Scooby-Doo culprits' genders overtime")
+```
+
+---
+
+# Culprits' Gender Overtime
+
+
+```r
+culprit_gender
+```
+
+![](DATA-612_Project-3_AnNguyen_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+
+
+---
+
+class: center, middle, inverse
+
+# The Best Detective in Scooby-Doo
+
+### Who captured the most culprits in Scooby-Doo?
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data Exploration &amp; Challenges
+
+- Culprits could be captured only when they are human being
+
+--
+
+- Point of interest: Who captured the culprits?
+
+- Columns: [18:22] and c(39, 40, 42, 43)
+
+- Data challenges: improper datatype; Improper variables (dummy variables under the `characters` category)
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+- Convert datatype from `&lt;str&gt;` to binary values
+
+- Use `pivot_wider()` function to cleanup the dummy variables
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+- Convert `&lt;str&gt;` to binary values
+
+
+```r
+scooby_pivot &lt;- scoobydoo %&gt;%
+  mutate(
+    year_aired = 10 * ((lubridate::year(date_aired) + 1) %/% 10),
+    across(
+*     c(caught_fred, caught_daphnie, caught_velma, caught_shaggy, caught_scooby),
+*     ~ ifelse(.x == "TRUE", 1, 0)
+*   )
+  )
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+
+```r
+scooby_pivot &lt;- scoobydoo %&gt;%
+  mutate(
+    year_aired = 10 * ((lubridate::year(date_aired) + 1) %/% 10),
+    across(
+      c(caught_fred, caught_daphnie, caught_velma, caught_shaggy, caught_scooby),
+      ~ ifelse(.x == "TRUE", 1, 0)
+    )
+  ) %&gt;%
+* mutate_if(is.logical, as.integer) %&gt;%
+  rename(
+*   fred = caught_fred, daphnie = caught_daphnie, velma = caught_velma, shaggy = caught_shaggy,
+*   scoobydoo = caught_scooby, others = caught_other, na = caught_not
+  ) %&gt;%
+  select(
+    1:15, 42, 43,
+    c("year_aired", "monster_real", "fred", "daphnie", "velma", "shaggy", "scoobydoo", "others", "na"),
+  )
+```
+
+---
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+
+```r
+scooby_pivot &lt;- scooby_pivot %&gt;%
+* pivot_longer(
+*   names_to = "who_caught_the_villains",
+*   values_to = "was_the_villains_caught",
+*   cols = c("fred", "daphnie", "velma", "shaggy", "scoobydoo", "others", "na")
+  ) %&gt;%
+  # We only want to see who was the star character within each Scoobydoo episode
+  filter(was_the_villains_caught == 1)
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+
+```r
+head(scooby_pivot[, c("who_caught_the_villains", "was_the_villains_caught")], 10)
+```
+
+```
+## # A tibble: 10 × 2
+##    who_caught_the_villains was_the_villains_caught
+##    &lt;chr&gt;                                     &lt;dbl&gt;
+##  1 shaggy                                        1
+##  2 scoobydoo                                     1
+##  3 shaggy                                        1
+##  4 scoobydoo                                     1
+##  5 fred                                          1
+##  6 scoobydoo                                     1
+##  7 fred                                          1
+##  8 fred                                          1
+##  9 shaggy                                        1
+## 10 shaggy                                        1
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data Visualization
+
+- Use `geom_stream()` function under the `ggstream` package to display our result
+
+- Apply colors from `rainbow()` under the `viridis` package
+
+
+
+
+```r
+scooby_stream &lt;- scooby_pivot %&gt;%
+  filter(who_caught_the_villains != "na") %&gt;%
+  group_by(year_aired, who_caught_the_villains) %&gt;%
+  summarize(victories_count = n()) %&gt;%
+  mutate(percentage = victories_count / sum(victories_count)) %&gt;%
+* ggplot(aes(x = year_aired, y = percentage, fill = who_caught_the_villains)) +
+* geom_stream(alpha = 0.8, type = "proportional") +
+* scale_fill_manual(values = rainbow(6)) +
+  theme_minimal() +
+  ggtitle("Percentage of culprits arrested")
+```
+
+```
+## `summarise()` has grouped output by 'year_aired'. You can override using the `.groups` argument.
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+
+```r
+scooby_stream
+```
+
+![](DATA-612_Project-3_AnNguyen_files/figure-html/unnamed-chunk-15-1.png)&lt;!-- --&gt;
+
+
+---
+
+class: center, middle, inverse
+
+# Scooby-Doo IMDB Rating
+
+### Which Scooby-Doo version was most fascinating?
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data Exploration &amp; Challenge
+
+- There are 5 types of Scooby-Doo been aired in the past 6 decades: TV Series, TV Series (Segment), Movie (Theatrical), Movie, Crossover (single story)
+
+- Different IMDB rating
+
+- Goal: To discover which Scooby-Doo version have the highest IMDB Rating overtime
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data ETL
+
+- Access per 5-year period
+
+
+```r
+scooby_pivot %&gt;%
+  mutate(year_aired_2 = 5 * ((lubridate::year(date_aired) + 1) %/% 5)) %&gt;%
+  select(date_aired, year_aired_2)
+```
+
+```
+## # A tibble: 554 × 2
+##    date_aired year_aired_2
+##    &lt;date&gt;            &lt;dbl&gt;
+##  1 1969-09-13         1970
+##  2 1969-09-13         1970
+##  3 1969-09-20         1970
+##  4 1969-09-27         1970
+##  5 1969-10-04         1970
+##  6 1969-10-11         1970
+##  7 1969-10-18         1970
+##  8 1969-10-25         1970
+##  9 1969-11-08         1970
+## 10 1969-11-15         1970
+## # … with 544 more rows
+```
+
+--
+
+- Use `median(imdb)` rating to avoid possible outliers
+
+
+```r
+scooby_pivot %&gt;%
+  mutate(year_aired_2 = 5 * ((lubridate::year(date_aired) + 1) %/% 5)) %&gt;%
+  group_by(year_aired_2, format) %&gt;%
+* mutate(avg_rating = median(as.double(imdb)))
+```
+
+```
+## Warning in median(as.double(imdb)): NAs introduced by coercion
+```
+
+```
+## # A tibble: 554 × 23
+## # Groups:   year_aired_2, format [27]
+##    index series_name  network season title  imdb  engagement date_aired run_time
+##    &lt;dbl&gt; &lt;chr&gt;        &lt;chr&gt;   &lt;chr&gt;  &lt;chr&gt;  &lt;chr&gt; &lt;chr&gt;      &lt;date&gt;        &lt;dbl&gt;
+##  1     1 Scooby Doo,… CBS     1      What … 8.1   556        1969-09-13       21
+##  2     1 Scooby Doo,… CBS     1      What … 8.1   556        1969-09-13       21
+##  3     2 Scooby Doo,… CBS     1      A Clu… 8.1   479        1969-09-20       22
+##  4     3 Scooby Doo,… CBS     1      Hassl… 8     455        1969-09-27       21
+##  5     4 Scooby Doo,… CBS     1      Mine … 7.8   426        1969-10-04       21
+##  6     5 Scooby Doo,… CBS     1      Decoy… 7.5   391        1969-10-11       21
+##  7     6 Scooby Doo,… CBS     1      What … 8.4   384        1969-10-18       21
+##  8     7 Scooby Doo,… CBS     1      Never… 7.6   358        1969-10-25       21
+##  9     9 Scooby Doo,… CBS     1      The B… 8.1   371        1969-11-08       21
+## 10    10 Scooby Doo,… CBS     1      Bedla… 8     346        1969-11-15       21
+## # … with 544 more rows, and 14 more variables: format &lt;chr&gt;,
+## #   monster_name &lt;chr&gt;, monster_gender &lt;chr&gt;, monster_type &lt;chr&gt;,
+## #   monster_subtype &lt;chr&gt;, monster_species &lt;chr&gt;, setting_terrain &lt;chr&gt;,
+## #   setting_country_state &lt;chr&gt;, year_aired &lt;dbl&gt;, monster_real &lt;chr&gt;,
+## #   who_caught_the_villains &lt;chr&gt;, was_the_villains_caught &lt;dbl&gt;,
+## #   year_aired_2 &lt;dbl&gt;, avg_rating &lt;dbl&gt;
+```
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data Visualization
+
+
+```r
+scooby_imdb &lt;- scooby_pivot %&gt;%
+  mutate(year_aired_2 = 5 * ((lubridate::year(date_aired) + 1) %/% 5)) %&gt;%
+  group_by(year_aired_2, format) %&gt;%
+  mutate(avg_rating = median(as.double(imdb))) %&gt;%
+  filter(!is.na(avg_rating)) %&gt;%
+* ggplot(aes(x = factor(year_aired_2), y = format, fill = avg_rating)) +
+* geom_tile()
+```
+
+```
+## Warning in median(as.double(imdb)): NAs introduced by coercion
+```
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data Visualization
+
+- Add elements and change colors
+
+
+```r
+scooby_imdb &lt;- scooby_imdb +
+* labs(x = "Years", y = "Categories") +
+  theme_minimal() +
+* ggtitle("Average IMDB Ratings") +
+* scale_fill_gradient(low = "yellow", high = "steelblue")
+```
+
+---
+
+# Scooby-Doo IMDB Rating
+
+
+```r
+scooby_imdb
+```
+
+![](DATA-612_Project-3_AnNguyen_files/figure-html/unnamed-chunk-20-1.png)&lt;!-- --&gt;
+
+
+---
+
+class: center, middle, inverse
+
+# Conclusion
+
+---
+
+# Conclusion
+
+- Scooby-Doo is a rich dataset for practicing data wrangling: `pivot_&lt;&gt;`, formatting date, reformatting datatype, breaking value chunks
+
+--
+
+- Story trendline: gender equality, character non-discrimination
+
+--
+
+- IMDB Rates get lower overtime - perhaps due to the entrance of many new animations
+
+---
+
+class: center, middle, inverse
+
+# Scooby-Doo by-doo, Where are you?
+
+### Our works have finally done!
+
+---
+
+class: center, middle, inverse
+
+# THANK YOU !
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

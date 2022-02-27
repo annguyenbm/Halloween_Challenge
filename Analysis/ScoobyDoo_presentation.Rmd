@@ -1,0 +1,490 @@
+---
+title: "DATA 612 - Project 3"
+subtitle: "A Scooby-Doo Dataset Project"
+author: "Binh Minh An Nguyen"
+date: "`r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+class: top
+background-image: url(https://i.pinimg.com/originals/d5/2c/23/d52c2351fb92e34df234c43ad3c5799f.jpg)
+background-size: contain
+
+
+class: bottom
+
+## Scooby-Doo by-Doo, Where are you ?
+
+### We have got some works to do right now...
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+```
+
+???
+
+Image credit: [Shaila Williams](https://www.pinterest.com/shailswhales/scooby-doo/)
+
+---
+# Executive Summary
+
+### Data source & Inspirations
+
+--
+
+### Data Challenge
+
+- Overview
+
+- Challenges
+
+--
+
+### Culprits' Genders Overtime
+
+--
+
+### Who was the best detective?
+
+--
+
+### Overview Scooby-Doo Rating
+
+---
+class: inverse, center, middle
+
+# Scooby-Doo by-Doo, Where are you ?
+
+### We shall start our works now...
+
+---
+
+# Data Source & Inspirations
+
+- Data source: [TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-07-13/readme.md)
+
+--
+
+- Access Scooby-Doo data by:
+
+```{r eval=FALSE, tidy=FALSE}
+scoobydoo <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-13/scoobydoo.csv")
+```
+
+--
+
+- Project Inspiration: _Predict which #TidyTuesday Scooby Doo monsters are REAL with a tuned decision tree model_ by [Jilia Silge](https://juliasilge.com/blog/scooby-doo/?fbclid=IwAR0Z4KIDtgXopelQeFN50rorqvZo4Na8tY_SP_PT0RxMiAFNalHxxSftOvw)
+
+--
+
+- Point of Interests: Culprits' genders overtime; Who captured the most culprit?; IMDB rating by type overtime
+
+---
+# Data Exploration & Challenge
+
+- Each row = An episode records the type, rating, aired-time, aired-region, culprits' traits, voice actors/actresses, main characters' activities
+
+- 603 observations and 75 columns but not all of them are proper variables
+
+--
+
+- Improper datatype [1]
+
+--
+
+- Value chunk within one single cell ~ conflict with criteria of a tibble [2]
+
+--
+
+.footnote[
+[1], [2] These data challenges will be displayed while doing ETL
+]
+
+---
+
+class: center, middle, inverse
+
+# Culprits' Gender Overtime
+
+---
+
+# Culprits' Genders Overtime
+
+### Data Exploration & Challenges
+
+- Multiple values represent traits of the culprits within one single cell
+
+```{r tidy=FALSE, comment='#', include=FALSE}
+# Load tidyverse package
+library(tidyverse)
+
+# Read the original dataset
+scoobydoo <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-13/scoobydoo.csv")
+```
+
+- Some `culprit_gender = NULL` because not all of the culprits are `Human`
+
+```{r tidy=FALSE}
+scoobydoo %>%
+  filter(culprit_gender == "NULL") %>%
+  select(monster_type, monster_gender, culprit_gender) %>%
+  head()
+```
+
+
+---
+
+# Culprits' Gender Overtime
+
+### Data ETL
+
+- Address the data challenges
+
+```{r tidy=FALSE}
+scooby_bd <- scoobydoo %>%
+  select(index, imdb, format, date_aired, monster_gender, monster_type, culprit_gender) %>%
+  filter(culprit_gender != "NULL") %>%
+  # Breakdown multiple values into multiple rows
+  separate_rows(monster_gender, sep = ",", convert = TRUE) %>% #<<
+  separate_rows(monster_type, sep = ",", convert = TRUE) %>% #<<
+  separate_rows(culprit_gender, sep = ",", convert = TRUE) %>% #<<
+  mutate(
+    culprit_gender = ifelse(culprit_gender != "Female", "Male", "Female"),
+    year_aired = 10 * ((lubridate::year(date_aired) + 1) %/% 10)
+  )
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data ETL
+
+- Count the number of culprits by the Scooby-Doo's aired years and the culprits' genders
+
+```{r tidy=FALSE}
+# To ensure that there is no duplicate
+scooby_bd <- scooby_bd %>%
+  distinct() %>%
+  group_by(year_aired, culprit_gender) %>%
+  summarize(count = n()) %>%
+  mutate(percentage_gender = round((count / sum(count)) * 100, 2)) #<<
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data ETL
+
+- Check the ETL results:
+
+```{r scooby-db-result}
+scooby_bd
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data Visualization
+
+- Create a bar chart display the **trend of culprits' genders** over the past 6 decades
+
+```{r tidy=FALSE}
+culprit_gender <- scooby_bd %>%
+  ggplot(aes(x = factor(year_aired), y = percentage_gender, fill = culprit_gender)) + #<<
+  geom_col(position = position_dodge(preserve = "single"), alpha = 0.8) #<<
+```
+
+---
+
+# Culprits' Gender Overtime
+
+### Data Visualization
+
+- Add elements to the chart
+
+```{r tidy=FALSE}
+culprit_gender <- culprit_gender +
+  labs(x = "Years", y = "Culprit Count (%)", fill = "Genders") + #<<
+  theme_classic() + #<<
+  theme(legend.title = element_blank()) + #<<
+  ggtitle("Scooby-Doo culprits' genders overtime") #<<
+```
+
+---
+
+# Culprits' Gender Overtime
+
+```{r tidy=FALSE, fig.width=10, fig.height=6}
+culprit_gender
+```
+
+
+---
+
+class: center, middle, inverse
+
+# The Best Detective in Scooby-Doo
+
+### Who captured the most culprits in Scooby-Doo?
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data Exploration & Challenges
+
+- Culprits could be captured only when they are human being
+
+--
+
+- Point of interest: Who captured the culprits?
+
+- Columns: [18:22] and c(39, 40, 42, 43)
+
+- Data challenges: improper datatype; Improper variables (dummy variables under the `characters` category)
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+- Convert datatype from `<str>` to binary values
+
+- Use `pivot_wider()` function to cleanup the dummy variables
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+- Convert `<str>` to binary values
+
+```{r tidy=FALSE}
+scooby_pivot <- scoobydoo %>%
+  mutate(
+    year_aired = 10 * ((lubridate::year(date_aired) + 1) %/% 10),
+    across(
+      c(caught_fred, caught_daphnie, caught_velma, caught_shaggy, caught_scooby), #<<
+      ~ ifelse(.x == "TRUE", 1, 0)                                                #<<
+    ) #<<
+  )
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+```{r tidy=FALSE}
+scooby_pivot <- scoobydoo %>%
+  mutate(
+    year_aired = 10 * ((lubridate::year(date_aired) + 1) %/% 10),
+    across(
+      c(caught_fred, caught_daphnie, caught_velma, caught_shaggy, caught_scooby),
+      ~ ifelse(.x == "TRUE", 1, 0)
+    )
+  ) %>%
+  mutate_if(is.logical, as.integer) %>% #<<
+  rename(
+    fred = caught_fred, daphnie = caught_daphnie, velma = caught_velma, shaggy = caught_shaggy, #<<
+    scoobydoo = caught_scooby, others = caught_other, na = caught_not #<<
+  ) %>%
+  select(
+    1:15, 42, 43,
+    c("year_aired", "monster_real", "fred", "daphnie", "velma", "shaggy", "scoobydoo", "others", "na"),
+  )
+```
+
+---
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+```{r tidy=FALSE}
+scooby_pivot <- scooby_pivot %>%
+  pivot_longer( #<<
+    names_to = "who_caught_the_villains", #<<
+    values_to = "was_the_villains_caught", #<<
+    cols = c("fred", "daphnie", "velma", "shaggy", "scoobydoo", "others", "na") #<<
+  ) %>%
+  # We only want to see who was the star character within each Scoobydoo episode
+  filter(was_the_villains_caught == 1)
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data ETL
+
+```{r}
+head(scooby_pivot[, c("who_caught_the_villains", "was_the_villains_caught")], 10)
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+### Data Visualization
+
+- Use `geom_stream()` function under the `ggstream` package to display our result
+
+- Apply colors from `rainbow()` under the `viridis` package
+
+```{r include=FALSE}
+library(ggstream)
+library(viridis)
+```
+
+```{r tidy=FALSE}
+scooby_stream <- scooby_pivot %>%
+  filter(who_caught_the_villains != "na") %>%
+  group_by(year_aired, who_caught_the_villains) %>%
+  summarize(victories_count = n()) %>%
+  mutate(percentage = victories_count / sum(victories_count)) %>%
+  ggplot(aes(x = year_aired, y = percentage, fill = who_caught_the_villains)) + #<<
+  geom_stream(alpha = 0.8, type = "proportional") + #<<
+  scale_fill_manual(values = rainbow(6)) + #<<
+  theme_minimal() +
+  ggtitle("Percentage of culprits arrested")
+```
+
+---
+
+# The Best Detective in Scooby-Doo
+
+```{r tidy=FALSE, fig.width=10, fig.height=5}
+scooby_stream
+```
+
+
+---
+
+class: center, middle, inverse
+
+# Scooby-Doo IMDB Rating
+
+### Which Scooby-Doo version was most fascinating?
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data Exploration & Challenge
+
+- There are 5 types of Scooby-Doo been aired in the past 6 decades: TV Series, TV Series (Segment), Movie (Theatrical), Movie, Crossover (single story)
+
+- Different IMDB rating
+
+- Goal: To discover which Scooby-Doo version have the highest IMDB Rating overtime
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data ETL
+
+- Access per 5-year period
+
+```{r tidy=FALSE}
+scooby_pivot %>%
+  mutate(year_aired_2 = 5 * ((lubridate::year(date_aired) + 1) %/% 5)) %>%
+  select(date_aired, year_aired_2)
+```
+
+--
+
+- Use `median(imdb)` rating to avoid possible outliers
+
+```{r tidy=FALSE}
+scooby_pivot %>%
+  mutate(year_aired_2 = 5 * ((lubridate::year(date_aired) + 1) %/% 5)) %>%
+  group_by(year_aired_2, format) %>%
+  mutate(avg_rating = median(as.double(imdb))) #<<
+```
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data Visualization
+
+```{r tidy=FALSE}
+scooby_imdb <- scooby_pivot %>%
+  mutate(year_aired_2 = 5 * ((lubridate::year(date_aired) + 1) %/% 5)) %>%
+  group_by(year_aired_2, format) %>%
+  mutate(avg_rating = median(as.double(imdb))) %>%
+  filter(!is.na(avg_rating)) %>%
+  ggplot(aes(x = factor(year_aired_2), y = format, fill = avg_rating)) + #<<
+  geom_tile() #<<
+```
+
+---
+
+# Scooby-Doo IMDB Rating
+
+### Data Visualization
+
+- Add elements and change colors
+
+```{r tidy=FALSE}
+scooby_imdb <- scooby_imdb +
+  labs(x = "Years", y = "Categories") + #<<
+  theme_minimal() +
+  ggtitle("Average IMDB Ratings") + #<<
+  scale_fill_gradient(low = "yellow", high = "steelblue") #<<
+```
+
+---
+
+# Scooby-Doo IMDB Rating
+
+```{r tidy=FALSE, fig.width=10, fig.height=6}
+scooby_imdb
+```
+
+
+---
+
+class: center, middle, inverse
+
+# Conclusion
+
+---
+
+# Conclusion
+
+- Scooby-Doo is a rich dataset for practicing data wrangling: `pivot_<>`, formatting date, reformatting datatype, breaking value chunks
+
+--
+
+- Story trendline: gender equality, character non-discrimination
+
+--
+
+- IMDB Rates get lower overtime - perhaps due to the entrance of many new animations
+
+---
+
+class: center, middle, inverse
+
+# Scooby-Doo by-doo, Where are you?
+
+### Our works have finally done!
+
+---
+
+class: center, middle, inverse
+
+# THANK YOU !
